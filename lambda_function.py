@@ -1,7 +1,3 @@
-# AWS Guard-Duty Integration Lambda Function v0.1 08/11/2021, Arnab Roy
-# Needs more work on error logging
-# MV API Class - Credit Martin Ohl 
-
 import sys
 import os, io, time, base64
 import requests
@@ -21,6 +17,10 @@ intel_file = os.environ["intel_file"]
 aws_region = os.environ["aws_region"]
 gd_ti_name = os.environ["gd_ti_name"]
 gd_ti_uri = os.environ["gd_ti_uri"]
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 
 class AWS():
 
@@ -60,9 +60,11 @@ class AWS():
                             Name=gd_ti_name,
                             ThreatIntelSetId=setId
                         )
+                    else:
+                        logging.error("Configured Threat intel set not found ")
     
     def get_secret(self):
-
+        logging.info("Extracting API Keys from store")
         secret_name = os.environ["secret_name"]
         region_name = os.environ["aws_region"]
 
@@ -227,8 +229,8 @@ class MVAPI():
                     ioc_count += len(campaign_container['iocs'])
                     main_container.append(campaign_container)
 
-            #print('MVISION: Retrieved {} Campaigns including {} Indicators updated in the last 1 day.'
-                        #.format(str(len(main_container)), str(ioc_count)))
+            logging.info ('MVISION: Retrieved {} Campaigns including {} Indicators updated in the last 1 day.'
+                        .format(str(len(main_container)), str(ioc_count)))
             
             return main_container
 
@@ -251,99 +253,101 @@ class FEYECSV():
         if (status == 0):
             writer.writeheader()
         for campaign in campaigns:
-                    for ioc in campaign['iocs']:
-                        dict_campaign = {}
-                        repid = time.strftime("%y", time.localtime()) + "-" + str(randint(10000, 99999))
-                        dict_campaign['reportId'] = str(repid)
-                        dict_campaign['title'] = campaign["name"]
-                        dict_campaign['ThreatScape'] = ""
-                        dict_campaign['productType'] = "MAL"
-                        dict_campaign['publishDate'] = dp.parse(campaign["updated-on"]).timestamp()
-                        if(campaign['kb-article-link']):
-                            dict_campaign['reportLink'] = campaign['kb-article-link']
+                for ioc in campaign['iocs']:      
+                    dict_campaign = {} 
+                    repid = time.strftime("%y", time.localtime()) + "-" + str(randint(10000, 99999))
+                    dict_campaign['reportId'] = str(repid)
+                    dict_campaign['title'] = campaign["name"]
+                    dict_campaign['ThreatScape'] = ""
+                    dict_campaign['productType'] = "MAL"
+                    dict_campaign['publishDate'] = dp.parse(campaign["updated-on"]).timestamp()
+                    if(campaign['kb-article-link']):
+                        dict_campaign['reportLink'] = campaign['kb-article-link']
+                    else:
+                        dict_campaign['reportLink'] = 'https://mvision.mcafee.com'
+                    if(campaign['external-link']):        
+                        dict_campaign['webLink'] = campaign['external-link']
+                    else:
+                        dict_campaign['webLink'] = ''
+                    dict_campaign['emailIdentifier'] = ''
+                    dict_campaign['senderAddress'] = ''
+                    dict_campaign['senderName'] = ''
+                    if ioc['type'] == 'domain' or ioc['type'] == 'hostname':
+                        dict_campaign['sourceDomain'] = ioc['value']
+                    else:
+                        dict_campaign['sourceDomain'] = ''   
+                    if ioc['type'] == 'ip':
+                        dict_campaign['sourceIp'] = ioc['value']    
+                    else:
+                        dict_campaign['sourceIp'] = ''
+                    dict_campaign['subject'] = ''
+                    dict_campaign['recipient'] = ''
+                    dict_campaign['language'] = ''
+                    dict_campaign['fileName'] = ''
+                    dict_campaign['fileSize'] = ''
+                    if ioc['type'] == 'imphash' :
+                        dict_campaign['fuzzyHash'] = ioc['value']
+                    else:
+                        dict_campaign['fuzzyHash'] = ''    
+                    dict_campaign['fileIdentifier'] = 'Compromised'
+                    if ioc['type'] == 'md5':
+                        dict_campaign['md5'] = ioc['value']
+                    else:
+                        dict_campaign['md5'] = ''
+                    if ioc['type'] == 'sha1':
+                        dict_campaign['sha1'] = ioc['value']
+                    else:
+                        dict_campaign['sha1'] = ''
+                    if ioc['type'] == 'sha256':
+                        dict_campaign['sha256'] = ioc['value']
+                    else:
+                        dict_campaign['sha256'] = ''    
+                    dict_campaign['description'] = campaign['description']
+                    dict_campaign['fileType'] = ''
+                    dict_campaign['packer'] = ''
+                    dict_campaign['userAgent'] = ''
+                    dict_campaign['registry'] = ''
+                    dict_campaign['networkName'] = ''
+                    dict_campaign['asn'] = ''
+                    dict_campaign['cidr'] = ''
+                    if ioc['type'] == 'domain' or ioc['type'] == 'hostname':
+                        dict_campaign['domain'] = ioc['value']
+                    else:
+                        dict_campaign['domain'] = ''   
+                    dict_campaign['domainTimeOfLookup'] = ''
+                    dict_campaign['networkIdentifier'] = ''
+                    if ioc['type'] == 'ip':
+                        dict_campaign['ip'] = ioc['value']    
+                    else:
+                        dict_campaign['ip'] = ''
+                    if ioc['type'] == 'ip_port':
+                        ip_port = ioc['value'].split(":")
+                        dict_campaign['port'] = ip_port[1]
+                        dict_campaign['ip'] = ip_port[0]
+                    else:
+                        dict_campaign['port'] = ''
+                    if ioc['type'] == 'url':                       
+                        if str(ioc['value']).startswith('https://') or str(ioc['value']).startswith('http://'):
+                            pass
                         else:
-                            dict_campaign['reportLink'] = 'https://mvision.mcafee.com'
-                        if(campaign['external-link']):        
-                            dict_campaign['webLink'] = campaign['external-link']
-                        else:
-                            dict_campaign['webLink'] = ''
-                        dict_campaign['emailIdentifier'] = ''
-                        dict_campaign['senderAddress'] = ''
-                        dict_campaign['senderName'] = ''
-                        if ioc['type'] == 'domain' or ioc['type'] == 'hostname':
-                            dict_campaign['sourceDomain'] = ioc['value']
-                        else:
-                            dict_campaign['sourceDomain'] = ''   
-                        if ioc['type'] == 'ip':
-                            dict_campaign['sourceIp'] = ioc['value']    
-                        else:
-                            dict_campaign['sourceIp'] = ''
-                        dict_campaign['subject'] = ''
-                        dict_campaign['recipient'] = ''
-                        dict_campaign['language'] = ''
-                        dict_campaign['fileName'] = ''
-                        dict_campaign['fileSize'] = ''
-                        if ioc['type'] == 'imphash' :
-                            dict_campaign['fuzzyHash'] = ioc['value']
-                        else:
-                            dict_campaign['fuzzyHash'] = ''    
-                        dict_campaign['fileIdentifier'] = 'Compromised'
-                        if ioc['type'] == 'md5':
-                            dict_campaign['md5'] = ioc['value']
-                        else:
-                            dict_campaign['md5'] = ''
-                        if ioc['type'] == 'sha1':
-                            dict_campaign['sha1'] = ioc['value']
-                        else:
-                            dict_campaign['sha1'] = ''
-                        if ioc['type'] == 'sha256':
-                            dict_campaign['sha256'] = ioc['value']
-                        else:
-                            dict_campaign['sha256'] = ''    
-                        dict_campaign['description'] = campaign['description']
-                        dict_campaign['fileType'] = ''
-                        dict_campaign['packer'] = ''
-                        dict_campaign['userAgent'] = ''
-                        dict_campaign['registry'] = ''
-                        dict_campaign['networkName'] = ''
-                        dict_campaign['asn'] = ''
-                        dict_campaign['cidr'] = ''
-                        if ioc['type'] == 'domain' or ioc['type'] == 'hostname':
-                            dict_campaign['domain'] = ioc['value']
-                        else:
-                            dict_campaign['domain'] = ''   
-                        dict_campaign['domainTimeOfLookup'] = ''
-                        dict_campaign['networkIdentifier'] = ''
-                        if ioc['type'] == 'ip':
-                            dict_campaign['ip'] = ioc['value']    
-                        else:
-                            ##added dummy to avoid gd crash
-                            dict_campaign['ip'] = '1.1.1.1'
-                        if ioc['type'] == 'ip_port':
-                            dict_campaign['port'] = ioc['value']
-                        else:
-                            dict_campaign['port'] = ''
-                        if ioc['type'] == 'url':                       
-                            if str(ioc['value']).startswith('https://') or str(ioc['value']).startswith('http://'):
-                                pass
-                            else:
-                                ioc['value'] = 'https://{0}'.format(ioc['value'])       
-                            dict_campaign ['url'] = ioc['value']
-                        else:
-                            dict_campaign ['url'] = ''
-                        dict_campaign['protocol'] = ''
-                        dict_campaign['registrantName'] = ''
-                        dict_campaign['registrantEmail'] = ''
-                        dict_campaign['networkType'] = ''
-                        dict_campaign['malwareFamily'] = ''
-                        dict_campaign['observationTime'] =''
-                        writer.writerow(dict_campaign)     
-        return csv_string.getvalue().strip('\r\n')  
-
+                            ioc['value'] = 'https://{0}'.format(ioc['value'])       
+                        dict_campaign ['url'] = ioc['value']
+                    else:
+                        dict_campaign ['url'] = ''
+                    dict_campaign['protocol'] = ''
+                    dict_campaign['registrantName'] = ''
+                    dict_campaign['registrantEmail'] = ''
+                    dict_campaign['networkType'] = ''
+                    dict_campaign['malwareFamily'] = ''
+                    dict_campaign['observationTime'] =''
+                    writer.writerow(dict_campaign)   
+        return csv_string.getvalue()
 
 
 def lambda_handler(event, context):
     try:
+        
+        logging.info (" Starting IOC sync with MVISION Insights ")
         aws = AWS()
         secrets = aws.get_secret()
         mvapi = MVAPI(secrets)
@@ -355,13 +359,14 @@ def lambda_handler(event, context):
         try:
             obj.load()
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == "404":    
+            if e.response['Error']['Code'] == "404":
+                    logging.info("S3 Bucket/Update File not Found Creating new CSV")
                     feye_csv = feye.gen_feye_csv(campaigns,0)
                         
             else: 
-                    print ("Unknown Error")
+                    logging.error(datetime.now()+ "Unknown Error checking existing S3 bucket")
         else:
-            print ("Feed File Found ..updating")
+            logging.info( "S3 Bucket/Update File found updating CSV")
             feye_csv = feye.gen_feye_csv(campaigns,1)
         
         aws.write_csv_s3(feye_csv)
