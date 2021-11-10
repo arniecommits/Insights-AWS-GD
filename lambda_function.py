@@ -1,3 +1,7 @@
+# AWS Guard-Duty Integration Lambda Function v0.2 08/11/2021, Arnab Roy
+# Needs more work on error logging
+# MV API Class - Credit Martin Ohl 
+
 import sys
 import os, io, time, base64
 import requests
