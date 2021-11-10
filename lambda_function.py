@@ -64,8 +64,8 @@ class AWS():
                             Name=gd_ti_name,
                             ThreatIntelSetId=setId
                         )
-                    else:
-                        logging.error("Configured Threat intel set not found ")
+                        if not found:
+                            logging.error("Configured Threat intel set not found ")
     
     def get_secret(self):
         logging.info("Extracting API Keys from store")
