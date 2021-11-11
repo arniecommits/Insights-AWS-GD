@@ -1,5 +1,5 @@
-# AWS Guard-Duty Integration Lambda Function v0.2 08/11/2021, Arnab Roy
-# Needs more work on error logging
+# AWS Guard-Duty Integration Lambda Function v0.3 11/11/2021, Arnab Roy
+# Changed the file creation to split mode , every sync now is a different CSV file that gets ingested
 # MV API Class - Credit Martin Ohl 
 
 import sys
@@ -17,10 +17,10 @@ from datetime import datetime, timedelta
 
 ins_dur = int(os.environ["ins_dur"])
 bucket_name = os.environ["bucket_name"]
-intel_file = os.environ["intel_file"]
+intel_file = str(datetime.now().strftime("%Y%m%d-%H%M%S"))+'.csv'
 aws_region = os.environ["aws_region"]
 gd_ti_name = os.environ["gd_ti_name"]
-gd_ti_uri = os.environ["gd_ti_uri"]
+gd_ti_uri = os.environ["gd_ti_uri"]+intel_file
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -32,17 +32,10 @@ class AWS():
         
         s3 = boto3.resource('s3')
         obj = s3.Object(bucket_name, intel_file)
-        try:
-            obj.load()
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == "404":    
-                obj.put(Body=content)
-                    
-        else: 
-                  
-            prev_contents = obj.get()['Body'].read().decode('utf-8') 
-            final_contents = prev_contents + content    
-            obj.put(Body=final_contents)
+        try: 
+            obj.put(Body=content)
+        except:
+            logging.error("Unable to write file to S3 Bucket")    
    
 
     def guard_duty(self):
@@ -51,10 +44,20 @@ class AWS():
         if len(response['DetectorIds']) == 0:
             raise Exception('Failed to read GuardDuty info. Please check if the service is activated')
         detectorId = response['DetectorIds'][0]
-        response = guardduty.list_threat_intel_sets(DetectorId=detectorId)
-        for setId in response['ThreatIntelSetIds']:
+        try:
+            response = guardduty.create_threat_intel_set(
+                Activate=True,
+                DetectorId=detectorId,
+                Format='FIRE_EYE',
+                Location=gd_ti_uri,
+                Name=gd_ti_name
+            )
+        except:
+                logging.info("Found existing TI Feed, update intel set")
+                found = False
+                response = guardduty.list_threat_intel_sets(DetectorId=detectorId)
+                for setId in response['ThreatIntelSetIds']:
                     response = guardduty.get_threat_intel_set(DetectorId=detectorId, ThreatIntelSetId=setId)
-                    
                     if (gd_ti_name == response['Name']):
                         found = True
                         response = guardduty.update_threat_intel_set(
@@ -64,8 +67,10 @@ class AWS():
                             Name=gd_ti_name,
                             ThreatIntelSetId=setId
                         )
-                        if not found:
-                            logging.error("Configured Threat intel set not found ")
+                        break
+
+                if not found:
+                    raise
     
     def get_secret(self):
         logging.info("Extracting API Keys from store")
@@ -246,7 +251,7 @@ class MVAPI():
 
 class FEYECSV():
 
-    def gen_feye_csv(self, campaigns,status):
+    def gen_feye_csv(self, campaigns):
         csv_columns = ['reportId','title','ThreatScape','productType','publishDate','reportLink','webLink','emailIdentifier',
         'senderAddress','senderName','sourceDomain','sourceIp','subject','recipient','language','fileName','fileSize','fuzzyHash',
         'fileIdentifier','md5','sha1','sha256','description','fileType','packer','userAgent','registry','networkName','asn','cidr','domain',
@@ -254,8 +259,7 @@ class FEYECSV():
         'malwareFamily','observationTime']
         csv_string = io.StringIO()
         writer = csv.DictWriter(csv_string, fieldnames=csv_columns)
-        if (status == 0):
-            writer.writeheader()
+        writer.writeheader()
         for campaign in campaigns:
                 for ioc in campaign['iocs']:      
                     dict_campaign = {} 
@@ -351,28 +355,16 @@ class FEYECSV():
 def lambda_handler(event, context):
     try:
         
-        logging.info (" Starting IOC sync with MVISION Insights ")
+        logging.info ("Starting IOC sync with MVISION Insights ")
         aws = AWS()
         secrets = aws.get_secret()
         mvapi = MVAPI(secrets)
         campaigns = mvapi.main()
         s3 = boto3.resource('s3')
         obj = s3.Object(bucket_name, intel_file)
-        feye = FEYECSV()
-        feye_csv = ""
-        try:
-            obj.load()
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == "404":
-                    logging.info("S3 Bucket/Update File not Found Creating new CSV")
-                    feye_csv = feye.gen_feye_csv(campaigns,0)
-                        
-            else: 
-                    logging.error(datetime.now()+ "Unknown Error checking existing S3 bucket")
-        else:
-            logging.info( "S3 Bucket/Update File found updating CSV")
-            feye_csv = feye.gen_feye_csv(campaigns,1)
-        
+        feye = FEYECSV()        
+        logging.info( "Creating CSV File with name "+bucket_name+" "+intel_file)
+        feye_csv = feye.gen_feye_csv(campaigns)
         aws.write_csv_s3(feye_csv)
         aws.guard_duty()
     
@@ -381,5 +373,4 @@ def lambda_handler(event, context):
         logging.error("Error in {location}.{funct_name}() - line {line_no} : {error}"
                         .format(location=__name__, funct_name=sys._getframe().f_code.co_name,
                                 line_no=exc_tb.tb_lineno, error=str(error)))
-
 
