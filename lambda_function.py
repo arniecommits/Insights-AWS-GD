@@ -32,6 +32,7 @@ class AWS():
         
         s3 = boto3.resource('s3')
         obj = s3.Object(bucket_name, intel_file)
+        logging.debug(content)
         try: 
             obj.put(Body=content)
         except:
@@ -360,8 +361,6 @@ def lambda_handler(event, context):
         secrets = aws.get_secret()
         mvapi = MVAPI(secrets)
         campaigns = mvapi.main()
-        s3 = boto3.resource('s3')
-        obj = s3.Object(bucket_name, intel_file)
         feye = FEYECSV()        
         logging.info( "Creating CSV File with name "+bucket_name+" "+intel_file)
         feye_csv = feye.gen_feye_csv(campaigns)
