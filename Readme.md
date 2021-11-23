@@ -14,9 +14,7 @@ campaign data to enrich the Guard Duty findings.
 
 ## Integration Architecture
 
-![](C:\Users\arnab\AppData\Roaming\marktext\images\2021-11-23-16-11-01-image.png)
-
-
+![image](https://user-images.githubusercontent.com/60926235/143061272-4b84a1c8-2a66-4d11-8c36-3b667194c70d.png)
 
 ### Install Pre-Reqs:
 
