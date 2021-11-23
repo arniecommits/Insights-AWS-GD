@@ -14,7 +14,7 @@ campaign data to enrich the Guard Duty findings.
 
 ## Integration Architecture
 
-<img src="https://user-images.githubusercontent.com/60926235/143022902-e05a00e0-8b8c-40e2-a6c5-dae2860016a1.png" title="" alt="image" width="721">
+![](C:\Users\arnab\AppData\Roaming\marktext\images\2021-11-23-16-11-01-image.png)
 
 
 
@@ -24,7 +24,7 @@ To use the provided Lambda script, you need to build the Lambda python layer wit
 
 
 
-Minimum Permissions the Lambda Execution Role attached to the Lambda Funtion must have: IAM List/some type of read permissions, eg. policy bellow
+Minimum Permissions the Lambda Execution Role attached to the Lambda Funtion must have at a minimum the following policy bellow
 
 ```
 {
