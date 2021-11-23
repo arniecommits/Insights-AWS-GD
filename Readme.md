@@ -106,7 +106,7 @@ Configure Lambda Environment Variables as follows :
 
 Configure event bridge scheduled event as a trigger for Lambda:
 
-![](C:\Users\arnab\AppData\Roaming\marktext\images\2021-11-23-16-04-48-image.png)
+![image](https://user-images.githubusercontent.com/60926235/143061546-e1d1e0e6-906f-4d94-9a47-2f8c1b6c2714.png)
 
 Note: The event schedule rate should match the value for ins_dur environment variable in the lambda function
 
